@@ -9,7 +9,6 @@ app.secret_key = 'your_secret_key_here'
 
 DB_PATH = 'users.db'
 
-# Ініціалізація бази, якщо ще не існує
 if os.stat(DB_PATH).st_size == 0:
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -68,4 +67,5 @@ def logout():
     return redirect(url_for('login'))
 
 if __name__ == '__main__':
-    app.run(port=8000)
+    port = int(os.environ.get("PORT", 8000))
+    app.run(host='0.0.0.0', port=port)
