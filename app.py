@@ -1,6 +1,7 @@
-from flask import Flask, render_template, request, redirect, url_for, session
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 import sqlite3
 import os
+import random
 
 open("users.db", "a").close()  # створюємо файл, якщо не існує
 
@@ -65,6 +66,17 @@ def register():
 def logout():
     session.pop('username', None)
     return redirect(url_for('login'))
+
+@app.route('/game')
+def game():
+    if 'username' in session:
+        return render_template('game.html', username=session['username'])
+    return redirect(url_for('login'))
+
+@app.route('/api/new_board')
+def new_board():
+    board = [[random.randint(1, 5) for _ in range(5)] for _ in range(5)]
+    return jsonify({'board': board})
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8000))
