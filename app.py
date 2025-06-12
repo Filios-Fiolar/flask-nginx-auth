@@ -3,11 +3,10 @@ import sqlite3
 import os
 import random
 
-open("users.db", "a").close()  # створюємо файл, якщо не існує
+open("users.db", "a").close()
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key_here'
-
 DB_PATH = 'users.db'
 
 if os.stat(DB_PATH).st_size == 0:
@@ -73,9 +72,26 @@ def game():
         return render_template('game.html', username=session['username'])
     return redirect(url_for('login'))
 
+def is_valid_board(board):
+    size = len(board)
+    for r in range(size):
+        for c in range(size):
+            val = board[r][c]
+            if c <= size - 3 and board[r][c+1] == val and board[r][c+2] == val:
+                return False
+            if r <= size - 3 and board[r+1][c] == val and board[r+2][c] == val:
+                return False
+    return True
+
+def generate_clean_board():
+    while True:
+        board = [[random.randint(1, 5) for _ in range(7)] for _ in range(7)]
+        if is_valid_board(board):
+            return board
+
 @app.route('/api/new_board')
 def new_board():
-    board = [[random.randint(1, 5) for _ in range(5)] for _ in range(5)]
+    board = generate_clean_board()
     return jsonify({'board': board})
 
 if __name__ == '__main__':
