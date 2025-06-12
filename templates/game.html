@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Игра 3 в ряд</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .board { display: grid; grid-template-columns: repeat(5, 60px); grid-gap: 5px; }
+        .cell { width: 60px; height: 60px; background: #f0f0f0; font-size: 24px; text-align: center; line-height: 60px; border: 1px solid #ccc; cursor: pointer; }
+        .score-box { margin-left: 30px; }
+    </style>
+</head>
+<body class="container py-4">
+    <h2>Добро пожаловать, {{ username }}!</h2>
+    <div class="d-flex">
+        <div id="board" class="board"></div>
+        <div class="score-box">
+            <h4>Очки: <span id="score">0</span></h4>
+            <a href="/logout" class="btn btn-secondary mt-3">Выйти</a>
+        </div>
+    </div>
+
+    <script>
+        let board = []
+        let score = 0
+        let first = null
+
+        function createBoard(data) {
+            board = data
+            const el = document.getElementById('board')
+            el.innerHTML = ''
+            for (let r = 0; r < 5; r++) {
+                for (let c = 0; c < 5; c++) {
+                    const cell = document.createElement('div')
+                    cell.className = 'cell'
+                    cell.textContent = board[r][c]
+                    cell.dataset.row = r
+                    cell.dataset.col = c
+                    cell.onclick = () => select(r, c)
+                    el.appendChild(cell)
+                }
+            }
+        }
+
+        function select(r, c) {
+            if (!first) {
+                first = {r, c}
+                highlight(r, c)
+            } else {
+                swap(first.r, first.c, r, c)
+                first = null
+            }
+        }
+
+        function highlight(r, c) {
+            const index = r * 5 + c
+            document.querySelectorAll('.cell')[index].style.background = '#d0f0d0'
+        }
+
+        function swap(r1, c1, r2, c2) {
+            if (Math.abs(r1 - r2) + Math.abs(c1 - c2) !== 1) return
+            const temp = board[r1][c1]
+            board[r1][c1] = board[r2][c2]
+            board[r2][c2] = temp
+            createBoard(board)
+            checkMatches()
+        }
+
+        function checkMatches() {
+            let matched = []
+            for (let r = 0; r < 5; r++) {
+                for (let c = 0; c < 3; c++) {
+                    if (board[r][c] === board[r][c+1] && board[r][c] === board[r][c+2]) {
+                        matched.push([r, c], [r, c+1], [r, c+2])
+                    }
+                }
+            }
+            for (let c = 0; c < 5; c++) {
+                for (let r = 0; r < 3; r++) {
+                    if (board[r][c] === board[r+1][c] && board[r][c] === board[r+2][c]) {
+                        matched.push([r, c], [r+1, c], [r+2, c])
+                    }
+                }
+            }
+            if (matched.length > 0) {
+                matched.forEach(([r, c]) => board[r][c] = null)
+                score += matched.length === 3 ? 100 : matched.length === 4 ? 250 : 500
+                document.getElementById('score').textContent = score
+                dropFigures()
+                setTimeout(() => checkMatches(), 500)
+            }
+        }
+
+        function dropFigures() {
+            for (let c = 0; c < 5; c++) {
+                let column = []
+                for (let r = 4; r >= 0; r--) {
+                    if (board[r][c] !== null) column.push(board[r][c])
+                }
+                while (column.length < 5) {
+                    column.push(Math.floor(Math.random() * 5) + 1)
+                }
+                for (let r = 4; r >= 0; r--) {
+                    board[r][c] = column[4 - r]
+                }
+            }
+            createBoard(board)
+        }
+
+        fetch('/api/new_board')
+            .then(res => res.json())
+            .then(data => createBoard(data.board))
+    </script>
+</body>
+</html>
