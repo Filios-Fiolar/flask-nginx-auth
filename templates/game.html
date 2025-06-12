@@ -74,54 +74,94 @@ function handleClick(event) {
         const dc = Math.abs(selected.col - col);
         if ((dr === 1 && dc === 0) || (dr === 0 && dc === 1)) {
             swapAndCheck(selected, {row, col});
+            selected = null;
+        } else {
+            selected = {row, col};
         }
-        selected = null;
     }
     drawBoard();
 }
 
 function swapAndCheck(a, b) {
-    [board[a.row][a.col], board[b.row][b.col]] = [board[b.row][b.col], board[a.row][a.col]];
-
-    const matched = checkMatches();
-    if (!matched) {
+    swap(a, b);
+    if (hasMatches()) {
+        resolveMatches();
+    } else {
         setTimeout(() => {
-            [board[a.row][a.col], board[b.row][b.col]] = [board[b.row][b.col], board[a.row][a.col]];
+            swap(a, b);
             drawBoard();
         }, 300);
-    } else {
-        score += matched * 100;
+    }
+}
+
+function swap(a, b) {
+    [board[a.row][a.col], board[b.row][b.col]] = [board[b.row][b.col], board[a.row][a.col]];
+}
+
+function hasMatches() {
+    for (let i = 0; i < 5; i++) {
+        for (let j = 0; j < 3; j++) {
+            let val = board[i][j];
+            if (val && val === board[i][j+1] && val === board[i][j+2]) return true;
+            val = board[j][i];
+            if (val && val === board[j+1][i] && val === board[j+2][i]) return true;
+        }
+    }
+    return false;
+}
+
+function resolveMatches() {
+    let matched = false;
+
+    // Горизонтально
+    for (let i = 0; i < 5; i++) {
+        for (let j = 0; j < 3; j++) {
+            let val = board[i][j];
+            if (val && val === board[i][j+1] && val === board[i][j+2]) {
+                board[i][j] = board[i][j+1] = board[i][j+2] = 0;
+                score += 100;
+                matched = true;
+            }
+        }
+    }
+
+    // Вертикально
+    for (let j = 0; j < 5; j++) {
+        for (let i = 0; i < 3; i++) {
+            let val = board[i][j];
+            if (val && val === board[i+1][j] && val === board[i+2][j]) {
+                board[i][j] = board[i+1][j] = board[i+2][j] = 0;
+                score += 100;
+                matched = true;
+            }
+        }
+    }
+
+    if (matched) {
+        collapseBoard();
+        drawBoard();
         document.getElementById("score").textContent = score;
-        removeMatches();
+        setTimeout(resolveMatches, 300);
     }
 }
 
-function checkMatches() {
-    let count = 0;
-    const rows = board.length;
-    const cols = board[0].length;
-
-    for (let i = 0; i < rows; i++) {
-        for (let j = 0; j <= cols - 3; j++) {
-            if (board[i][j] === board[i][j+1] && board[i][j] === board[i][j+2]) {
-                count++;
+function collapseBoard() {
+    for (let j = 0; j < 5; j++) {
+        for (let i = 4; i >= 0; i--) {
+            if (board[i][j] === 0) {
+                for (let k = i - 1; k >= 0; k--) {
+                    if (board[k][j] !== 0) {
+                        board[i][j] = board[k][j];
+                        board[k][j] = 0;
+                        break;
+                    }
+                }
             }
         }
-    }
-
-    for (let j = 0; j < cols; j++) {
-        for (let i = 0; i <= rows - 3; i++) {
-            if (board[i][j] === board[i+1][j] && board[i][j] === board[i+2][j]) {
-                count++;
-            }
+        for (let i = 0; i < 5; i++) {
+            if (board[i][j] === 0) board[i][j] = Math.floor(Math.random() * 5) + 1;
         }
     }
-
-    return count;
-}
-
-function removeMatches() {
-    createBoard();
 }
 
 createBoard();
