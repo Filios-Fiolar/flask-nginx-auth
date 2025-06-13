@@ -3,45 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Game</title>
-    <style>
-        .board {
-            display: grid;
-            grid-template-columns: repeat(7, 50px);
-            grid-template-rows: repeat(7, 50px);
-            gap: 2px;
-        }
-        .cell {
-            width: 50px;
-            height: 50px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border: 1px solid #ccc;
-            font-weight: bold;
-            font-size: 20px;
-            cursor: pointer;
-        }
-        .selected {
-            background-color: yellow;
-        }
-        #buttons {
-            margin-top: 10px;
-        }
-        #end-screen {
-            display: none;
-            position: absolute;
-            top: 40%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background-color: white;
-            border: 2px solid black;
-            padding: 20px;
-            text-align: center;
-        }
-        #end-screen button {
-            margin: 10px;
-        }
-    </style>
+    <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
     <h1>Добро пожаловать, {{ username }}</h1>
@@ -64,6 +26,17 @@
         let score = 0;
         let lastSwap = [];
 
+        function getEmoji(num) {
+            switch(num) {
+                case 1: return "⭐";
+                case 2: return "🌙";
+                case 3: return "🔥";
+                case 4: return "💧";
+                case 5: return "🍀";
+                default: return "";
+            }
+        }
+
         function createBoard(data) {
             board = data;
             const boardEl = document.getElementById("board");
@@ -74,7 +47,7 @@
                     cell.className = "cell";
                     cell.dataset.row = i;
                     cell.dataset.col = j;
-                    cell.textContent = board[i][j];
+                    cell.textContent = getEmoji(board[i][j]);
                     cell.addEventListener("click", () => handleClick(i, j, cell));
                     boardEl.appendChild(cell);
                 }
@@ -193,7 +166,7 @@
             boardEl.childNodes.forEach(cell => {
                 const row = parseInt(cell.dataset.row);
                 const col = parseInt(cell.dataset.col);
-                cell.textContent = board[row][col];
+                cell.textContent = getEmoji(board[row][col]);
             });
         }
 
