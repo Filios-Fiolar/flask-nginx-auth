@@ -3,42 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <title>Game</title>
-    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
-    <h1>Добро пожаловать, {{ username }}</h1>
-    <div id="score">Очки: 0</div>
-    <div class="board" id="board"></div>
-    <div id="buttons">
-        <button onclick="restartGame()">Перезапустить</button>
-        <button onclick="endGame()">Закончить игру</button>
+    <div class="container">
+        <div class="sidebar">
+            <h1>Добро пожаловать, {{ username }}</h1>
+            <div id="score">Очки: 0</div>
+            <div id="buttons">
+                <button onclick="restartGame()">Перезапустить</button>
+                <button onclick="endGame()">Закончить игру</button>
+            </div>
+        </div>
+        <div class="game-area">
+            <div class="board" id="board"></div>
+        </div>
     </div>
+
     <div id="end-screen">
         <h2>Игра окончена</h2>
         <p id="final-score"></p>
         <button onclick="restartGame()">Начать новую игру</button>
         <button onclick="window.location.href='/'">Выйти</button>
     </div>
+
     <script>
-        const boardSize = 7;
+        const boardSize = 5;
+        const symbols = ['🌙', '⭐', '🔥', '💧', '🍀'];
         let board = [];
         let selected = [];
         let score = 0;
         let lastSwap = [];
 
-        function getEmoji(num) {
-            switch(num) {
-                case 1: return "⭐";
-                case 2: return "🌙";
-                case 3: return "🔥";
-                case 4: return "💧";
-                case 5: return "🍀";
-                default: return "";
-            }
+        function randomInt() {
+            return Math.floor(Math.random() * symbols.length);
         }
 
         function createBoard(data) {
-            board = data;
+            board = data.map(row => row.map(i => symbols[i]));
             const boardEl = document.getElementById("board");
             boardEl.innerHTML = "";
             for (let i = 0; i < boardSize; i++) {
@@ -47,7 +49,7 @@
                     cell.className = "cell";
                     cell.dataset.row = i;
                     cell.dataset.col = j;
-                    cell.textContent = getEmoji(board[i][j]);
+                    cell.textContent = board[i][j];
                     cell.addEventListener("click", () => handleClick(i, j, cell));
                     boardEl.appendChild(cell);
                 }
@@ -64,9 +66,7 @@
                         resolveMatches(true);
                         setTimeout(() => {
                             dropAndFill();
-                            if (!anyPossibleMoves()) {
-                                showEndScreen();
-                            }
+                            if (!anyPossibleMoves()) showEndScreen();
                         }, 300);
                     } else {
                         swap(r1, c1, row, col);
@@ -81,11 +81,6 @@
                 selected = [[row, col]];
                 cellEl.classList.add("selected");
             }
-        }
-
-        function clearSelection() {
-            selected = [];
-            document.querySelectorAll(".cell").forEach(c => c.classList.remove("selected"));
         }
 
         function swap(r1, c1, r2, c2) {
@@ -110,9 +105,7 @@
             const toRemove = Array.from(Array(boardSize), () => Array(boardSize).fill(false));
             let removed = false;
             if (fromPlayerMove) {
-                for (const [r, c] of lastSwap) {
-                    markMatches(r, c, toRemove);
-                }
+                for (const [r, c] of lastSwap) markMatches(r, c, toRemove);
             } else {
                 for (let r = 0; r < boardSize; r++) {
                     for (let c = 0; c < boardSize; c++) {
@@ -123,7 +116,7 @@
             for (let r = 0; r < boardSize; r++) {
                 for (let c = 0; c < boardSize; c++) {
                     if (toRemove[r][c]) {
-                        board[r][c] = 0;
+                        board[r][c] = null;
                         removed = true;
                     }
                 }
@@ -137,7 +130,7 @@
 
         function markMatches(r, c, toRemove) {
             const val = board[r][c];
-            if (val === 0) return;
+            if (!val) return;
             let hor = [[r, c]];
             for (let i = c + 1; i < boardSize && board[r][i] === val; i++) hor.push([r, i]);
             for (let i = c - 1; i >= 0 && board[r][i] === val; i--) hor.push([r, i]);
@@ -152,10 +145,10 @@
             for (let c = 0; c < boardSize; c++) {
                 let stack = [];
                 for (let r = boardSize - 1; r >= 0; r--) {
-                    if (board[r][c] !== 0) stack.push(board[r][c]);
+                    if (board[r][c]) stack.push(board[r][c]);
                 }
                 for (let r = boardSize - 1; r >= 0; r--) {
-                    board[r][c] = stack.length ? stack.shift() : randomInt();
+                    board[r][c] = stack.length ? stack.shift() : symbols[randomInt()];
                 }
             }
             updateBoard();
@@ -166,7 +159,7 @@
             boardEl.childNodes.forEach(cell => {
                 const row = parseInt(cell.dataset.row);
                 const col = parseInt(cell.dataset.col);
-                cell.textContent = getEmoji(board[row][col]);
+                cell.textContent = board[row][col];
             });
         }
 
@@ -183,8 +176,9 @@
             document.getElementById("score").textContent = "Очки: " + score;
         }
 
-        function randomInt() {
-            return Math.floor(Math.random() * 5) + 1;
+        function clearSelection() {
+            selected = [];
+            document.querySelectorAll(".cell").forEach(c => c.classList.remove("selected"));
         }
 
         function restartGame() {
