@@ -55,13 +55,14 @@
         <h2>Игра окончена</h2>
         <p id="final-score"></p>
         <button onclick="restartGame()">Начать новую игру</button>
-        <button onclick="window.location.href='/';">Выйти</button>
+        <button onclick="window.location.href='/'">Выйти</button>
     </div>
     <script>
         const boardSize = 7;
         let board = [];
         let selected = [];
         let score = 0;
+        let lastSwap = [];
 
         function createBoard(data) {
             board = data;
@@ -85,8 +86,9 @@
                 const [r1, c1] = selected[0];
                 if ((Math.abs(r1 - row) === 1 && c1 === col) || (Math.abs(c1 - col) === 1 && r1 === row)) {
                     swap(r1, c1, row, col);
+                    lastSwap = [[r1, c1], [row, col]];
                     if (hasMatchAt(r1, c1) || hasMatchAt(row, col)) {
-                        resolveMatches();
+                        resolveMatches(true);
                         setTimeout(() => {
                             dropAndFill();
                             if (!anyPossibleMoves()) {
@@ -131,35 +133,46 @@
             return count >= 3;
         }
 
-        function resolveMatches() {
-            let removed;
-            do {
-                removed = false;
-                const toRemove = Array.from(Array(boardSize), () => Array(boardSize).fill(false));
+        function resolveMatches(fromPlayerMove = false) {
+            const toRemove = Array.from(Array(boardSize), () => Array(boardSize).fill(false));
+            let removed = false;
+            if (fromPlayerMove) {
+                for (const [r, c] of lastSwap) {
+                    markMatches(r, c, toRemove);
+                }
+            } else {
                 for (let r = 0; r < boardSize; r++) {
                     for (let c = 0; c < boardSize; c++) {
-                        const val = board[r][c];
-                        if (val === 0) continue;
-                        let match = [[r, c]];
-                        for (let i = c + 1; i < boardSize && board[r][i] === val; i++) match.push([r, i]);
-                        if (match.length >= 3) match.forEach(([r1, c1]) => toRemove[r1][c1] = true);
-                        match = [[r, c]];
-                        for (let i = r + 1; i < boardSize && board[i][c] === val; i++) match.push([i, c]);
-                        if (match.length >= 3) match.forEach(([r1, c1]) => toRemove[r1][c1] = true);
+                        markMatches(r, c, toRemove);
                     }
                 }
-                for (let r = 0; r < boardSize; r++) {
-                    for (let c = 0; c < boardSize; c++) {
-                        if (toRemove[r][c]) {
-                            board[r][c] = 0;
-                            score += 100;
-                            removed = true;
-                        }
+            }
+            for (let r = 0; r < boardSize; r++) {
+                for (let c = 0; c < boardSize; c++) {
+                    if (toRemove[r][c]) {
+                        board[r][c] = 0;
+                        removed = true;
                     }
                 }
-                updateScore();
+            }
+            if (removed) {
+                updateScore(toRemove);
                 dropAndFill();
-            } while (removed);
+                resolveMatches();
+            }
+        }
+
+        function markMatches(r, c, toRemove) {
+            const val = board[r][c];
+            if (val === 0) return;
+            let hor = [[r, c]];
+            for (let i = c + 1; i < boardSize && board[r][i] === val; i++) hor.push([r, i]);
+            for (let i = c - 1; i >= 0 && board[r][i] === val; i--) hor.push([r, i]);
+            if (hor.length >= 3) hor.forEach(([r1, c1]) => toRemove[r1][c1] = true);
+            let ver = [[r, c]];
+            for (let i = r + 1; i < boardSize && board[i][c] === val; i++) ver.push([i, c]);
+            for (let i = r - 1; i >= 0 && board[i][c] === val; i--) ver.push([i, c]);
+            if (ver.length >= 3) ver.forEach(([r1, c1]) => toRemove[r1][c1] = true);
         }
 
         function dropAndFill() {
@@ -184,7 +197,16 @@
             });
         }
 
-        function updateScore() {
+        function updateScore(toRemove) {
+            let count = 0;
+            for (let r = 0; r < boardSize; r++) {
+                for (let c = 0; c < boardSize; c++) {
+                    if (toRemove[r][c]) count++;
+                }
+            }
+            if (count === 3) score += 100;
+            else if (count === 4) score += 200;
+            else if (count >= 5) score += 500;
             document.getElementById("score").textContent = "Очки: " + score;
         }
 
