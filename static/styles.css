@@ -1,19 +1,5 @@
 body {
     font-family: Arial, sans-serif;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-
-h1 {
-    margin-top: 20px;
-}
-
-#score {
-    margin: 10px;
-    font-size: 20px;
 }
 
 .board {
@@ -34,7 +20,7 @@ h1 {
     border: 1px solid #ccc;
     background-color: #f0f0f0;
     font-size: 30px;
-    transition: transform 0.3s ease, opacity 0.3s ease;
+    transition: all 0.3s ease;
 }
 
 .cell.moving {
@@ -43,13 +29,37 @@ h1 {
 
 .cell.removed {
     opacity: 0;
+    transition: opacity 0.5s ease;
+}
+
+#score,
+#buttons,
+#end-screen {
+    text-align: center;
 }
 
 #buttons {
-    text-align: center;
-    margin: 10px;
+    margin-top: 15px;
 }
 
 #end-screen {
+    display: none;
+    position: absolute;
+    top: 40%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: white;
+    border: 2px solid black;
+    padding: 20px;
     text-align: center;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+    z-index: 10;
+}
+
+#end-screen h2 {
+    margin-bottom: 10px;
+}
+
+#end-screen button {
+    margin: 5px;
 }
