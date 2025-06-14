@@ -13,7 +13,7 @@
         <button onclick="restartGame()">Перезапустить</button>
         <button onclick="endGame()">Закончить игру</button>
     </div>
-    <div id="end-screen" style="display:none;">
+    <div id="end-screen">
         <h2>Игра окончена</h2>
         <p id="final-score"></p>
         <button onclick="restartGame()">Начать новую игру</button>
@@ -27,15 +27,16 @@
         let score = 0;
         let lastSwap = [];
 
-        const symbols = ["🌙", "⭐", "💧", "🔥", "🍀"];
+        fetch("/api/new_board")
+            .then(res => res.json())
+            .then(data => {
+                board = data.board.map(row => row.slice(0, boardSize));
+                createBoard();
+            });
 
-        function createBoard(data) {
-            board = data;
-            updateBoard();
-        }
-
-        function updateBoard() {
+        function createBoard() {
             const boardEl = document.getElementById("board");
+            boardEl.style.gridTemplate = `repeat(${boardSize}, 60px) / repeat(${boardSize}, 60px)`;
             boardEl.innerHTML = "";
             for (let i = 0; i < boardSize; i++) {
                 for (let j = 0; j < boardSize; j++) {
@@ -43,120 +44,147 @@
                     cell.className = "cell";
                     cell.dataset.row = i;
                     cell.dataset.col = j;
-                    cell.textContent = symbols[board[i][j] - 1];
+                    cell.textContent = getSymbol(board[i][j]);
                     cell.addEventListener("click", () => handleClick(i, j, cell));
                     boardEl.appendChild(cell);
                 }
             }
         }
 
-        function handleClick(row, col, cellEl) {
+        function getSymbol(n) {
+            const symbols = ["", "🌑","⭐","🍀","🔥","💧"];
+            return symbols[n] || "?";
+        }
+
+        function handleClick(r, c, el) {
             if (selected.length === 1) {
                 const [r1, c1] = selected[0];
-                if ((Math.abs(r1 - row) === 1 && c1 === col) || (Math.abs(c1 - col) === 1 && r1 === row)) {
-                    swap(r1, c1, row, col);
-                    if (hasMatchAt(r1, c1) || hasMatchAt(row, col)) {
+                if ((Math.abs(r1-r)+Math.abs(c1-c)) === 1) {
+                    swap(r1, c1, r, c);
+                    lastSwap = [[r1, c1], [r, c]];
+                    if (checkAnyMatch()) {
                         resolveMatches(true);
                         setTimeout(() => {
                             dropAndFill();
-                            if (!anyPossibleMoves()) showEndScreen();
+                            if (!anyPossibleMoves()) endGame();
                         }, 300);
-                    } else {
-                        swap(r1, c1, row, col);
-                    }
-                    clearSelection();
-                    updateBoard();
-                } else {
-                    clearSelection();
-                    handleClick(row, col, cellEl);
+                    } else swap(r1, c1, r, c);
                 }
+                clearSelection();
+                refresh();
             } else {
                 clearSelection();
-                selected = [[row, col]];
-                cellEl.classList.add("selected");
+                selected = [[r,c]];
+                el.classList.add("selected");
             }
-        }
-
-        function swap(r1, c1, r2, c2) {
-            const temp = board[r1][c1];
-            board[r1][c1] = board[r2][c2];
-            board[r2][c2] = temp;
         }
 
         function clearSelection() {
             selected = [];
-            document.querySelectorAll(".cell").forEach(c => c.classList.remove("selected"));
+            document.querySelectorAll(".cell.selected").forEach(el=>el.classList.remove("selected"));
+        }
+
+        function swap(r1, c1, r2, c2) {
+            [board[r1][c1], board[r2][c2]] = [board[r2][c2], board[r1][c1]];
+        }
+
+        function checkAnyMatch() {
+            return lastSwap.some(([r,c]) => hasMatchAt(r, c));
         }
 
         function hasMatchAt(r, c) {
-            const val = board[r][c];
+            const v = board[r][c];
+            if (!v) return false;
+
             let count = 1;
-            for (let i = r - 1; i >= 0 && board[i][c] === val; i--) count++;
-            for (let i = r + 1; i < boardSize && board[i][c] === val; i++) count++;
+            for (let i=r-1; i>=0 && board[i][c]===v; i--) count++;
+            for (let i=r+1; i<boardSize && board[i][c]===v; i++) count++;
             if (count >= 3) return true;
+
             count = 1;
-            for (let j = c - 1; j >= 0 && board[r][j] === val; j--) count++;
-            for (let j = c + 1; j < boardSize && board[r][j] === val; j++) count++;
+            for (let j=c-1; j>=0 && board[r][j]===v; j--) count++;
+            for (let j=c+1; j<boardSize && board[r][j]===v; j++) count++;
             return count >= 3;
         }
 
-        function resolveMatches(fromPlayerMove = false) {
-            const toRemove = Array.from(Array(boardSize), () => Array(boardSize).fill(false));
-            let removed = false;
-            for (let r = 0; r < boardSize; r++) {
-                for (let c = 0; c < boardSize; c++) {
-                    const val = board[r][c];
-                    if (val === 0) continue;
+        function resolveMatches(fromPlayer=false) {
+            const toRemove = [...Array(boardSize)].map(_=>Array(boardSize).fill(false));
 
-                    let hor = [[r, c]];
-                    for (let i = c + 1; i < boardSize && board[r][i] === val; i++) hor.push([r, i]);
-                    for (let i = c - 1; i >= 0 && board[r][i] === val; i--) hor.push([r, i]);
-                    if (hor.length >= 3) hor.forEach(([r1, c1]) => toRemove[r1][c1] = true);
-
-                    let ver = [[r, c]];
-                    for (let i = r + 1; i < boardSize && board[i][c] === val; i++) ver.push([i, c]);
-                    for (let i = r - 1; i >= 0 && board[i][c] === val; i--) ver.push([i, c]);
-                    if (ver.length >= 3) ver.forEach(([r1, c1]) => toRemove[r1][c1] = true);
-                }
+            if (fromPlayer) {
+                lastSwap.forEach(([r, c]) => markMatches(r, c, toRemove));
+            } else {
+                for (let r=0; r<boardSize; r++)
+                    for (let c=0; c<boardSize; c++)
+                        markMatches(r, c, toRemove);
             }
 
-            for (let r = 0; r < boardSize; r++) {
-                for (let c = 0; c < boardSize; c++) {
+            let removedCount = 0;
+            for (let r=0; r<boardSize; r++) {
+                for (let c=0; c<boardSize; c++) {
                     if (toRemove[r][c]) {
                         board[r][c] = 0;
-                        score += 100;
-                        removed = true;
+                        removedCount++;
                     }
                 }
             }
-
-            updateScore();
-            if (removed) {
+            if (removedCount > 0) {
+                if (removedCount === 3) score += 100;
+                else if (removedCount === 4) score += 250;
+                else score += 500;
+                document.getElementById("score").textContent = `Очки: ${score}`;
                 dropAndFill();
-                resolveMatches();
+                resolveMatches(false);
             }
+        }
+
+        function markMatches(r, c, rm) {
+            const v = board[r][c];
+            if (!v) return;
+
+            let hor=[[r,c]], ver=[[r,c]];
+            for (let j=c+1; j<boardSize && board[r][j]===v; j++) hor.push([r,j]);
+            for (let j=c-1; j>=0 && board[r][j]===v; j--) hor.push([r,j]);
+            if (hor.length>=3) hor.forEach(([rr,cc])=>rm[rr][cc]=true);
+
+            for (let i=r+1; i<boardSize && board[i][c]===v; i++) ver.push([i,c]);
+            for (let i=r-1; i>=0 && board[i][c]===v; i--) ver.push([i,c]);
+            if (ver.length>=3) ver.forEach(([rr,cc])=>rm[rr][cc]=true);
         }
 
         function dropAndFill() {
-            for (let c = 0; c < boardSize; c++) {
-                let stack = [];
-                for (let r = boardSize - 1; r >= 0; r--) {
-                    if (board[r][c] !== 0) stack.push(board[r][c]);
-                }
-                for (let r = boardSize - 1; r >= 0; r--) {
-                    board[r][c] = stack.length ? stack.shift() : randomInt();
-                }
+            for (let c=0; c<boardSize; c++) {
+                let col = [];
+                for (let r=boardSize-1; r>=0; r--)
+                    if (board[r][c]) col.push(board[r][c]);
+                for (let r=boardSize-1; r>=0; r--)
+                    board[r][c] = col.length ? col.shift() : random(1,5);
             }
-            updateBoard();
-            if (!anyPossibleMoves()) showEndScreen();
+            refresh();
         }
 
-        function randomInt() {
-            return Math.floor(Math.random() * 5) + 1;
+        function anyPossibleMoves() {
+            for (let r=0; r<boardSize; r++)
+                for (let c=0; c<boardSize; c++)
+                    for (let [dr,dc] of [[1,0],[0,1]])
+                    {
+                        const nr=r+dr, nc=c+dc;
+                        if (nr<boardSize && nc<boardSize) {
+                            swap(r,c,nr,nc);
+                            const ok=hasMatchAt(r,c)||hasMatchAt(nr,nc);
+                            swap(r,c,nr,nc);
+                            if (ok) return true;
+                        }
+                    }
+            return false;
         }
 
-        function updateScore() {
-            document.getElementById("score").textContent = "Очки: " + score;
+        function refresh() {
+            document.querySelectorAll(".cell").forEach(el => {
+                const r=+el.dataset.row, c=+el.dataset.col;
+                el.textContent = getSymbol(board[r][c]);
+                el.classList.remove("removed");
+                if (board[r][c] === 0) el.classList.add("removed");
+            });
         }
 
         function restartGame() {
@@ -164,35 +192,10 @@
         }
 
         function endGame() {
-            showEndScreen();
-        }
-
-        function showEndScreen() {
             document.getElementById("final-score").textContent = `Ваш счёт: ${score}`;
             document.getElementById("end-screen").style.display = "block";
         }
 
-        function anyPossibleMoves() {
-            for (let r = 0; r < boardSize; r++) {
-                for (let c = 0; c < boardSize; c++) {
-                    const dirs = [[0, 1], [1, 0]];
-                    for (const [dr, dc] of dirs) {
-                        const nr = r + dr, nc = c + dc;
-                        if (nr < boardSize && nc < boardSize) {
-                            swap(r, c, nr, nc);
-                            if (hasMatchAt(r, c) || hasMatchAt(nr, nc)) {
-                                swap(r, c, nr, nc);
-                                return true;
-                            }
-                            swap(r, c, nr, nc);
-                        }
-                    }
-                }
-            }
-            return false;
-        }
-
-        fetch("/api/new_board").then(res => res.json()).then(data => createBoard(data.board));
     </script>
 </body>
 </html>
