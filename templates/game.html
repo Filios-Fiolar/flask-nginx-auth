@@ -1,201 +1,179 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="UTF-8">
-    <title>Game</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <meta charset="UTF-8">
+  <title>Game</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
-    <h1>Добро пожаловать, {{ username }}</h1>
-    <div id="score">Очки: 0</div>
-    <div class="board" id="board"></div>
-    <div id="buttons">
-        <button onclick="restartGame()">Перезапустить</button>
-        <button onclick="endGame()">Закончить игру</button>
-    </div>
-    <div id="end-screen">
-        <h2>Игра окончена</h2>
-        <p id="final-score"></p>
-        <button onclick="restartGame()">Начать новую игру</button>
-        <button onclick="window.location.href='/'">Выйти</button>
-    </div>
+  <h1>Добро пожаловать, {{ username }}</h1>
+  <div id="score">Очки: 0</div>
+  <div class="board" id="board"></div>
+  <div id="buttons">
+    <button onclick="restartGame()">Перезапустить</button>
+    <button onclick="endGame()">Закончить игру</button>
+  </div>
+  <div id="end-screen">
+    <h2>Игра окончена</h2>
+    <p id="final-score"></p>
+    <button onclick="restartGame()">Начать новую игру</button>
+    <button onclick="window.location.href='/'">Выйти</button>
+  </div>
+  <script>
+    const boardSize = 5;
+    let board = [];
+    let selected = [];
+    let score = 0;
 
-    <script>
-        const boardSize = 5;
-        let board = [];
-        let selected = [];
-        let score = 0;
-        let lastSwap = [];
+    fetch("/api/new_board")
+      .then(res => res.json())
+      .then(data => {
+        board = data.board.map(row => row.slice(0, boardSize));
+        createBoard();
+      });
 
-        fetch("/api/new_board")
-            .then(res => res.json())
-            .then(data => {
-                board = data.board.map(row => row.slice(0, boardSize));
-                createBoard();
-            });
+    function createBoard() {
+      const boardEl = document.getElementById("board");
+      boardEl.style.gridTemplate = `repeat(${boardSize}, 60px) / repeat(${boardSize}, 60px)`;
+      boardEl.innerHTML = "";
+      for (let r = 0; r < boardSize; r++) {
+        for (let c = 0; c < boardSize; c++) {
+          const cell = document.createElement("div");
+          cell.className = "cell";
+          cell.dataset.row = r;
+          cell.dataset.col = c;
+          cell.textContent = getSymbol(board[r][c]);
+          cell.onclick = () => handleClick(r, c, cell);
+          boardEl.appendChild(cell);
+        }
+      }
+    }
 
-        function createBoard() {
-            const boardEl = document.getElementById("board");
-            boardEl.style.gridTemplate = `repeat(${boardSize}, 60px) / repeat(${boardSize}, 60px)`;
-            boardEl.innerHTML = "";
-            for (let i = 0; i < boardSize; i++) {
-                for (let j = 0; j < boardSize; j++) {
-                    const cell = document.createElement("div");
-                    cell.className = "cell";
-                    cell.dataset.row = i;
-                    cell.dataset.col = j;
-                    cell.textContent = getSymbol(board[i][j]);
-                    cell.addEventListener("click", () => handleClick(i, j, cell));
-                    boardEl.appendChild(cell);
-                }
+    function getSymbol(n) {
+      const s = ["", "🌑","⭐","🍀","🔥","💧"];
+      return s[n] || "?";
+    }
+
+    function handleClick(r, c, el) {
+      if (selected.length === 1) {
+        const [r1, c1] = selected[0];
+        if (Math.abs(r - r1) + Math.abs(c - c1) === 1) {
+          swap(r1, c1, r, c);
+          if (checkAnyMatch(r1, c1, r, c)) {
+            resolveMatches();
+            setTimeout(() => { dropFill(); if (!anyMoves()) endGame(); }, 300);
+          } else swap(r1, c1, r, c);
+        }
+        clearSelect();
+        updateBoard();
+      } else {
+        clearSelect();
+        selected = [[r, c]];
+        el.classList.add("selected");
+      }
+    }
+
+    function clearSelect() {
+      selected = [];
+      document.querySelectorAll(".cell.selected").forEach(x => x.classList.remove("selected"));
+    }
+
+    function swap(r1, c1, r2, c2) {
+      [board[r1][c1], board[r2][c2]] = [board[r2][c2], board[r1][c1]];
+    }
+
+    function checkAnyMatch(r1, c1, r2, c2) {
+      return hasMatchAt(r1, c1) || hasMatchAt(r2, c2);
+    }
+
+    function hasMatchAt(r, c) {
+      const v = board[r][c];
+      if (!v) return false;
+      let cnt = 1;
+      for (let i = r-1; i >= 0 && board[i][c] === v; i--) cnt++;
+      for (let i = r+1; i < boardSize && board[i][c] === v; i++) cnt++;
+      if (cnt >= 3) return true;
+      cnt = 1;
+      for (let j = c-1; j >= 0 && board[r][j] === v; j--) cnt++;
+      for (let j = c+1; j < boardSize && board[r][j] === v; j++) cnt++;
+      return cnt >= 3;
+    }
+
+    function resolveMatches() {
+      const rem = Array(boardSize).fill(0).map(_=>Array(boardSize).fill(false));
+      for (let r = 0; r < boardSize; r++) {
+        for (let c = 0; c < boardSize; c++) {
+          mark(r, c, rem);
+        }
+      }
+      let tot = 0;
+      for (let r = 0; r < boardSize; r++) {
+        for (let c = 0; c < boardSize; c++) {
+          if (rem[r][c]) { board[r][c]=0; tot++; }
+        }
+      }
+      if (tot) {
+        if (tot === 3) score+=100;
+        else if (tot===4) score+=250;
+        else score+=500;
+        document.getElementById("score").textContent = `Очки: ${score}`;
+        dropFill();
+        resolveMatches();
+      }
+    }
+
+    function mark(r, c, rem) {
+      const v = board[r][c];
+      if (!v) return;
+      let hor = [[r,c]], ver = [[r,c]];
+      for (let j=c+1; j<boardSize && board[r][j]===v; j++) hor.push([r,j]);
+      for (let j=c-1; j>=0 && board[r][j]===v; j--) hor.push([r,j]);
+      if (hor.length>=3) hor.forEach(([rr,cc])=>rem[rr][cc]=true);
+
+      for (let i=r+1; i<boardSize && board[i][c]===v; i++) ver.push([i,c]);
+      for (let i=r-1; i>=0 && board[i][c]===v; i--) ver.push([i,c]);
+      if (ver.length>=3) ver.forEach(([rr,cc])=>rem[rr][cc]=true);
+    }
+
+    function dropFill() {
+      for (let c=0; c<boardSize; c++) {
+        const col = [];
+        for (let r=boardSize-1; r>=0; r--) if (board[r][c]) col.push(board[r][c]);
+        for (let r=boardSize-1; r>=0; r--) board[r][c] = col.shift() || random(1,5);
+      }
+      updateBoard();
+    }
+
+    function anyMoves() {
+      for (let r=0; r<boardSize; r++) {
+        for (let c=0; c<boardSize; c++) {
+          for (let [dr,dc] of [[1,0],[0,1]]) {
+            const nr = r+dr, nc = c+dc;
+            if (nr<boardSize && nc<boardSize) {
+              swap(r,c,nr,nc);
+              if (hasMatchAt(r,c)||hasMatchAt(nr,nc)){ swap(r,c,nr,nc); return true; }
+              swap(r,c,nr,nc);
             }
+          }
         }
+      }
+      return false;
+    }
 
-        function getSymbol(n) {
-            const symbols = ["", "🌑","⭐","🍀","🔥","💧"];
-            return symbols[n] || "?";
-        }
+    function updateBoard() {
+      document.querySelectorAll(".cell").forEach(el => {
+        const r = +el.dataset.row, c = +el.dataset.col;
+        el.textContent = getSymbol(board[r][c]);
+        el.classList.toggle("removed", board[r][c] === 0);
+      });
+    }
 
-        function handleClick(r, c, el) {
-            if (selected.length === 1) {
-                const [r1, c1] = selected[0];
-                if ((Math.abs(r1-r)+Math.abs(c1-c)) === 1) {
-                    swap(r1, c1, r, c);
-                    lastSwap = [[r1, c1], [r, c]];
-                    if (checkAnyMatch()) {
-                        resolveMatches(true);
-                        setTimeout(() => {
-                            dropAndFill();
-                            if (!anyPossibleMoves()) endGame();
-                        }, 300);
-                    } else swap(r1, c1, r, c);
-                }
-                clearSelection();
-                refresh();
-            } else {
-                clearSelection();
-                selected = [[r,c]];
-                el.classList.add("selected");
-            }
-        }
-
-        function clearSelection() {
-            selected = [];
-            document.querySelectorAll(".cell.selected").forEach(el=>el.classList.remove("selected"));
-        }
-
-        function swap(r1, c1, r2, c2) {
-            [board[r1][c1], board[r2][c2]] = [board[r2][c2], board[r1][c1]];
-        }
-
-        function checkAnyMatch() {
-            return lastSwap.some(([r,c]) => hasMatchAt(r, c));
-        }
-
-        function hasMatchAt(r, c) {
-            const v = board[r][c];
-            if (!v) return false;
-
-            let count = 1;
-            for (let i=r-1; i>=0 && board[i][c]===v; i--) count++;
-            for (let i=r+1; i<boardSize && board[i][c]===v; i++) count++;
-            if (count >= 3) return true;
-
-            count = 1;
-            for (let j=c-1; j>=0 && board[r][j]===v; j--) count++;
-            for (let j=c+1; j<boardSize && board[r][j]===v; j++) count++;
-            return count >= 3;
-        }
-
-        function resolveMatches(fromPlayer=false) {
-            const toRemove = [...Array(boardSize)].map(_=>Array(boardSize).fill(false));
-
-            if (fromPlayer) {
-                lastSwap.forEach(([r, c]) => markMatches(r, c, toRemove));
-            } else {
-                for (let r=0; r<boardSize; r++)
-                    for (let c=0; c<boardSize; c++)
-                        markMatches(r, c, toRemove);
-            }
-
-            let removedCount = 0;
-            for (let r=0; r<boardSize; r++) {
-                for (let c=0; c<boardSize; c++) {
-                    if (toRemove[r][c]) {
-                        board[r][c] = 0;
-                        removedCount++;
-                    }
-                }
-            }
-            if (removedCount > 0) {
-                if (removedCount === 3) score += 100;
-                else if (removedCount === 4) score += 250;
-                else score += 500;
-                document.getElementById("score").textContent = `Очки: ${score}`;
-                dropAndFill();
-                resolveMatches(false);
-            }
-        }
-
-        function markMatches(r, c, rm) {
-            const v = board[r][c];
-            if (!v) return;
-
-            let hor=[[r,c]], ver=[[r,c]];
-            for (let j=c+1; j<boardSize && board[r][j]===v; j++) hor.push([r,j]);
-            for (let j=c-1; j>=0 && board[r][j]===v; j--) hor.push([r,j]);
-            if (hor.length>=3) hor.forEach(([rr,cc])=>rm[rr][cc]=true);
-
-            for (let i=r+1; i<boardSize && board[i][c]===v; i++) ver.push([i,c]);
-            for (let i=r-1; i>=0 && board[i][c]===v; i--) ver.push([i,c]);
-            if (ver.length>=3) ver.forEach(([rr,cc])=>rm[rr][cc]=true);
-        }
-
-        function dropAndFill() {
-            for (let c=0; c<boardSize; c++) {
-                let col = [];
-                for (let r=boardSize-1; r>=0; r--)
-                    if (board[r][c]) col.push(board[r][c]);
-                for (let r=boardSize-1; r>=0; r--)
-                    board[r][c] = col.length ? col.shift() : random(1,5);
-            }
-            refresh();
-        }
-
-        function anyPossibleMoves() {
-            for (let r=0; r<boardSize; r++)
-                for (let c=0; c<boardSize; c++)
-                    for (let [dr,dc] of [[1,0],[0,1]])
-                    {
-                        const nr=r+dr, nc=c+dc;
-                        if (nr<boardSize && nc<boardSize) {
-                            swap(r,c,nr,nc);
-                            const ok=hasMatchAt(r,c)||hasMatchAt(nr,nc);
-                            swap(r,c,nr,nc);
-                            if (ok) return true;
-                        }
-                    }
-            return false;
-        }
-
-        function refresh() {
-            document.querySelectorAll(".cell").forEach(el => {
-                const r=+el.dataset.row, c=+el.dataset.col;
-                el.textContent = getSymbol(board[r][c]);
-                el.classList.remove("removed");
-                if (board[r][c] === 0) el.classList.add("removed");
-            });
-        }
-
-        function restartGame() {
-            location.reload();
-        }
-
-        function endGame() {
-            document.getElementById("final-score").textContent = `Ваш счёт: ${score}`;
-            document.getElementById("end-screen").style.display = "block";
-        }
-
-    </script>
+    function random(a,b){ return Math.floor(Math.random()*(b-a+1))+a; }
+    function restartGame(){ location.reload(); }
+    function endGame(){
+      document.getElementById("final-score").textContent = `Ваш счёт: ${score}`;
+      document.getElementById("end-screen").style.display = "block";
+    }
+  </script>
 </body>
 </html>
